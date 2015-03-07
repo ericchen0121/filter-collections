@@ -1,4 +1,8 @@
-Meteor.FilterCollections = function (collection, settings) {
+collectionCache = {};
+
+FilterCollections = function (collection, settings) {
+  if(! this instanceof FilterCollections)
+    return new FilterCollections(collection, settings);
 
   var self = this;
 
@@ -8,15 +12,19 @@ Meteor.FilterCollections = function (collection, settings) {
   
   self._collection = collection || {};
 
-
   self.name = (_settings.name) ? _settings.name : self._collection._name;
 
   var _subscriptionResultsId = 'fc-' + self.name + '-results';
   var _subscriptionCountId = 'fc-' + self.name + '-count';
 
-  self._collectionCount = new Mongo.Collection(self.name + 'CountFC');
+  var collectionCountName = self.name + 'CountFC';
+  if(collectionCache[collectionCountName] === undefined)
+    collectionCache[collectionCountName] = self._collectionCount = new Mongo.Collection(collectionCountName);
+  else
+    self._collectionCount = collectionCache[collectionCountName];
 
   var _deps = {
+    initial_ready: new Tracker.Dependency(),
     query: new Tracker.Dependency(),
     sort: new Tracker.Dependency(),
     pager: new Tracker.Dependency(),
@@ -61,13 +69,18 @@ Meteor.FilterCollections = function (collection, settings) {
     options: {}
   };
 
+  var _autorun_handle;
+  var _initial_ready; // FilterCollections is ready from e.g. Iron Router perspective
+
   /**
    * [_autorun description]
    * @return {[type]} [description]
    */
   var _autorun = function () {
 
-    Tracker.autorun(function (computation) {
+    if(_autorun_handle !== undefined) return;
+
+    _autorun_handle = Tracker.autorun(function (computation) {
 
       if (!_initialized) {
         self.sort.init(); // Set default query values for sorting.
@@ -110,6 +123,10 @@ Meteor.FilterCollections = function (collection, settings) {
         self.pager.setTotals(res);
       }
 
+      if(_subs.results.ready() && _subs.count.ready() && !initial_ready){
+        initial_ready = true;
+        _deps.initial_ready.changed();
+      }
     });
 
     return;
@@ -630,14 +647,9 @@ Meteor.FilterCollections = function (collection, settings) {
 
       if (_.isFunction(_callbacks.beforeResults))
         q = _callbacks.beforeResults(q) || q;
-
-      console.log('in getResults', self._collection)
-      console.log('in getResults', self)
-
+      
       var cursor = self._collection.find(q.selector, q.options);
       // var cursor = NflPlayers.find(q.selector, q.options);
-
-      console.log('in getResults', cursor)
 
       if (_.isFunction(_callbacks.afterResults))
         cursor = _callbacks.afterResults(cursor) || cursor;
@@ -645,6 +657,31 @@ Meteor.FilterCollections = function (collection, settings) {
       return cursor;
     }
   };
+
+  /**
+   * For integration with e.g. Iron Router
+   */
+
+  self.ready = function ready() {
+    _autorun();
+    _deps.initial_ready.depend();
+    return initial_ready;
+  };
+
+  self.stop = function stop() {
+    if(_autorun_handle !== undefined) {
+      _autorun_handle.stop();
+      _autorun_handle = undefined;
+    }
+    if(_subs.results.stop !== undefined) {
+      _subs.results.stop();
+      _subs.results = {}
+    }
+    if(_subs.count.stop !== undefined) {
+      _subs.count.stop();
+      _subs.count = {}
+    }
+  }
 
   /**
    * Template extensions

@@ -1,14 +1,16 @@
 Package.describe({
-  summary: " Smart package for Meteor that adds filter and pager behavior to our Meteor's collections.",
-  version: "0.1.9",
-  git: "https://github.com/ericchen0121/filter-collections"
+    summary: "Filter, paging and sort for Meteor collections with hooks and Iron Router support.",
+    version: "1.0.2",
+    name: "doctorpangloss:filter-collections",
+    git: "https://github.com/workpop/filter-collections"
 });
 
-Package.onUse(function(api) {
-  api.versionsFrom('METEOR@0.9.2.2');
+Package.onUse(function (api) {
+    api.versionsFrom('METEOR@1.0.2.1');
 
-  api.use('underscore', ['client', 'server']);
+    api.use('underscore', ['client', 'server']);
 
-  api.addFiles('filter-collections-client.js', ['client']);
-  api.addFiles('filter-collections-server.js', ['server']);
+    api.addFiles('filter-collections-client.js', ['client']);
+    api.addFiles('filter-collections-server.js', ['server']);
+    api.export('FilterCollections')
 });
